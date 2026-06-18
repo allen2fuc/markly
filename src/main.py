@@ -8,10 +8,10 @@ from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
 from sqlalchemy import Engine
-from sqlmodel import Session, SQLModel, create_engine, select
+from sqlmodel import Session, SQLModel, Column, create_engine, select, UUID, DateTime, Field
 
 from .models import Bookmark
 
@@ -50,32 +50,36 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # ── Schemas ──────────────────────────────────────────────────────────────────
 
-class BookmarkBase(BaseModel):
+class BookmarkBase(SQLModel):
     title: Annotated[str, Field(description="书签标题")]
     url: Annotated[str, Field(description="书签链接")]
-    description: Annotated[str, Field(default="", description="描述")]
+    description: Annotated[str, Field(description="描述")]
     tags: Annotated[list[str], Field(default_factory=list, description="标签列表")]
-    icon: Annotated[str, Field(default="", description="图标 URL（留空自动使用 favicon）")]
-    order: Annotated[int, Field(default=0, description="显示顺序，数字越小越靠前")]
+    icon: Annotated[str, Field(description="图标 URL（留空自动使用 favicon）")]
+    order: Annotated[int, Field(description="显示顺序，数字越小越靠前")]
 
 
-class BookmarkRead(BookmarkBase):
+class Bookmark(BookmarkBase, table=True):
+    __tablename__ = "bookmarks"
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, sa_column=Column(UUID, primary_key=True))
+    created_at: datetime = Field(sa_column=Column(DateTime, nullable=False, default=datetime.now))
+    updated_at: datetime = Field(sa_column=Column(DateTime, nullable=False, default=datetime.now))
+
+class BookmarkPublic(BookmarkBase):
     id: Annotated[uuid.UUID, Field(description="书签 ID")]
     created_at: Annotated[datetime, Field(description="创建时间")]
     updated_at: Annotated[datetime, Field(description="更新时间")]
 
-
 class BookmarkCreate(BookmarkBase):
     pass
 
-
-class BookmarkUpdate(BaseModel):
-    title: Annotated[Optional[str], Field(default=None, description="书签标题")]
-    url: Annotated[Optional[str], Field(default=None, description="书签链接")]
-    description: Annotated[Optional[str], Field(default=None, description="描述")]
-    tags: Annotated[Optional[list[str]], Field(default=None, description="标签列表")]
-    icon: Annotated[Optional[str], Field(default=None, description="图标 URL")]
-    order: Annotated[Optional[int], Field(default=None, description="显示顺序")]
+class BookmarkUpdate(BookmarkBase):
+    title: Optional[str]
+    url: Optional[str]
+    description: Optional[str]
+    tags: Optional[list[str]]
+    icon: Optional[str]
+    order: Optional[int]
 
 
 # ── DB dependency ─────────────────────────────────────────────────────────────
@@ -100,7 +104,7 @@ def get_admin(request: Request):
 
 # ── API ───────────────────────────────────────────────────────────────────────
 
-@app.get("/api/bookmarks", response_model=list[BookmarkRead])
+@app.get("/api/bookmarks", response_model=list[BookmarkPublic])
 def list_bookmarks(
     tag: str | None = None,
     q: str | None = None,
@@ -115,7 +119,7 @@ def list_bookmarks(
     return session.exec(stmt).all()
 
 
-@app.get("/api/bookmarks/{bookmark_id}", response_model=BookmarkRead)
+@app.get("/api/bookmarks/{bookmark_id}", response_model=BookmarkPublic)
 def get_bookmark(bookmark_id: uuid.UUID, session: Session = Depends(get_db)):
     bm = session.get(Bookmark, bookmark_id)
     if not bm:
@@ -123,16 +127,16 @@ def get_bookmark(bookmark_id: uuid.UUID, session: Session = Depends(get_db)):
     return bm
 
 
-@app.post("/api/bookmarks", response_model=BookmarkRead, status_code=status.HTTP_201_CREATED)
+@app.post("/api/bookmarks", response_model=BookmarkPublic, status_code=status.HTTP_201_CREATED)
 def create_bookmark(data: BookmarkCreate, session: Session = Depends(get_db)):
-    bm = Bookmark(**data.model_dump())
+    bm = Bookmark.model_validate(data)
     session.add(bm)
     session.commit()
     session.refresh(bm)
     return bm
 
 
-@app.put("/api/bookmarks/{bookmark_id}", response_model=BookmarkRead)
+@app.put("/api/bookmarks/{bookmark_id}", response_model=BookmarkPublic)
 def update_bookmark(bookmark_id: uuid.UUID, data: BookmarkUpdate, session: Session = Depends(get_db)):
     bm = session.get(Bookmark, bookmark_id)
     if not bm:
@@ -140,9 +144,8 @@ def update_bookmark(bookmark_id: uuid.UUID, data: BookmarkUpdate, session: Sessi
     raw = data.model_dump(exclude_none=True)
     if not raw:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="无更新字段")
-    for key, value in raw.items():
-        setattr(bm, key, value)
-    bm.updated_at = datetime.now()
+    bm.sqlmodel_update(raw)
+    session.add(bm)
     session.commit()
     session.refresh(bm)
     return bm
