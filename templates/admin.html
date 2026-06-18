@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Markly · 书签管理</title>
+<link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f5f5f3; --surface: #ffffff; --surface2: #f0efeb;
+    --border: #e4e3de; --border2: #d0cfc9;
+    --text: #1a1a18; --text2: #6b6a65; --text3: #9e9d98;
+    --accent: #5046e5; --accent-bg: #eeedfd; --accent-text: #3730c4;
+    --danger: #dc2626; --danger-bg: #fee2e2; --danger-border: #fca5a5;
+    --green: #16a34a; --green-bg: #dcfce7;
+    --radius: 10px; --radius-sm: 6px;
+    --shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111110; --surface: #1c1c1a; --surface2: #242422;
+      --border: #2e2e2b; --border2: #3a3a36;
+      --text: #e8e8e4; --text2: #9a9993; --text3: #636360;
+      --accent: #7b72ff; --accent-bg: #1e1c3a; --accent-text: #a09bff;
+      --danger: #f87171; --danger-bg: #3b0a0a; --danger-border: #7f1d1d;
+      --green: #4ade80; --green-bg: #052e16;
+    }
+  }
+
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; min-height: 100vh; }
+
+  .topbar {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(245,245,243,.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border); padding: 0 24px; height: 52px;
+    display: flex; align-items: center; gap: 16px;
+  }
+  @media (prefers-color-scheme: dark) { .topbar { background: rgba(17,17,16,.92); } }
+  .logo { font-size: 15px; font-weight: 700; letter-spacing: -.3px; color: var(--text); display: flex; align-items: center; gap: 7px; text-decoration: none; }
+  .logo-icon { width: 26px; height: 26px; background: var(--accent); border-radius: 7px; display: flex; align-items: center; justify-content: center; }
+  .logo-icon svg { display: block; }
+  .topbar-sep { width: 1px; height: 18px; background: var(--border2); }
+  .page-label { font-size: 13px; font-weight: 600; color: var(--text2); }
+  .topbar-right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: opacity .15s; text-decoration: none; white-space: nowrap; }
+  .btn:hover { opacity: .85; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-ghost { background: var(--surface2); color: var(--text2); border: 1px solid var(--border2); }
+  .btn-danger { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); }
+
+  .page { max-width: 1060px; margin: 0 auto; padding: 28px 24px 60px; }
+  .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; gap: 16px; flex-wrap: wrap; }
+  .page-heading { font-size: 20px; font-weight: 700; }
+  .page-sub { font-size: 13px; color: var(--text3); margin-top: 2px; }
+
+  .toolbar { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
+  .search-wrap { position: relative; flex: 1; max-width: 320px; min-width: 160px; }
+  .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text3); pointer-events: none; }
+  #search { width: 100%; height: 34px; padding: 0 12px 0 34px; border: 1px solid var(--border2); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 13px; outline: none; transition: border-color .15s; }
+  #search:focus { border-color: var(--accent); }
+  #search::placeholder { color: var(--text3); }
+  .result-count { font-size: 12px; color: var(--text3); margin-left: auto; }
+
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { padding: 10px 16px; text-align: left; font-size: 11px; font-weight: 600; color: var(--text3); letter-spacing: .05em; text-transform: uppercase; background: var(--surface2); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--surface2); }
+  td { padding: 12px 16px; vertical-align: middle; }
+
+  .bm-cell { display: flex; align-items: center; gap: 10px; }
+  .bm-favicon { width: 28px; height: 28px; border-radius: 7px; overflow: hidden; flex-shrink: 0; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--accent-text); }
+  .bm-favicon img { width: 100%; height: 100%; object-fit: contain; }
+  .bm-title { font-weight: 600; font-size: 13px; color: var(--text); }
+  .bm-url { font-size: 11px; color: var(--text3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+  .bm-url a { color: inherit; text-decoration: none; }
+  .bm-url a:hover { text-decoration: underline; color: var(--accent); }
+
+  .tags-cell { display: flex; flex-wrap: wrap; gap: 4px; }
+  .tag { font-size: 10px; font-weight: 500; padding: 2px 7px; border-radius: 99px; white-space: nowrap; }
+
+  .desc-cell { font-size: 12px; color: var(--text2); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .actions { display: flex; gap: 6px; }
+  .icon-btn { width: 28px; height: 28px; border: 1px solid var(--border2); border-radius: var(--radius-sm); background: transparent; cursor: pointer; color: var(--text2); display: flex; align-items: center; justify-content: center; transition: background .12s, color .12s, border-color .12s; flex-shrink: 0; }
+  .icon-btn:hover { background: var(--surface2); color: var(--text); }
+  .icon-btn.danger:hover { background: var(--danger-bg); color: var(--danger); border-color: var(--danger-border); }
+
+  .empty { text-align: center; padding: 56px 20px; color: var(--text3); }
+  .empty svg { margin-bottom: 10px; opacity: .35; }
+  .empty p { font-size: 13px; }
+
+  .skel td { padding: 14px 16px; }
+  .skel-line { height: 12px; border-radius: 6px; background: var(--surface2); position: relative; overflow: hidden; }
+  .skel-line::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,transparent,var(--border),transparent); animation:shimmer 1.4s infinite; }
+  @keyframes shimmer { from{transform:translateX(-100%)} to{transform:translateX(100%)} }
+
+  /* modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 300; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border-radius: 14px; border: 1px solid var(--border); width: 520px; max-width: 95vw; max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
+  .modal-header { padding: 20px 24px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .modal-title { font-size: 16px; font-weight: 700; }
+  .modal-body { padding: 20px 24px; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; flex-shrink: 0; }
+
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group.full { grid-column: 1 / -1; }
+  label { font-size: 12px; font-weight: 600; color: var(--text2); }
+  label small { font-weight: 400; color: var(--text3); }
+  input[type=text], textarea { padding: 8px 10px; border: 1px solid var(--border2); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 13px; font-family: inherit; outline: none; transition: border-color .15s; }
+  input[type=text]:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 68px; }
+
+  .tag-input-wrap { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; padding: 5px 10px; border: 1px solid var(--border2); border-radius: var(--radius-sm); background: var(--surface); min-height: 38px; cursor: text; transition: border-color .15s; }
+  .tag-input-wrap:focus-within { border-color: var(--accent); }
+  .tag-chip { display: flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 99px; font-size: 12px; font-weight: 500; background: var(--accent-bg); color: var(--accent-text); }
+  .tag-chip-x { background: none; border: none; cursor: pointer; color: inherit; opacity: .6; padding: 0; font-size: 15px; line-height: 1; display: flex; align-items: center; }
+  .tag-chip-x:hover { opacity: 1; }
+  .tag-input-field { border: none; outline: none; background: transparent; color: var(--text); font-size: 13px; min-width: 80px; flex: 1; padding: 2px 0; }
+
+  /* confirm */
+  .confirm-box { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); padding: 24px; width: 360px; max-width: 95vw; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
+  .confirm-title { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+  .confirm-body { font-size: 13px; color: var(--text2); margin-bottom: 20px; line-height: 1.6; }
+  .confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+  /* toast */
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(12px); background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 8px; font-size: 13px; font-weight: 500; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; z-index: 999; white-space: nowrap; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.success { background: var(--green); color: #fff; }
+  .toast.error   { background: var(--danger); color: #fff; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="logo" href="/">
+    <div class="logo-icon">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M3 1h8a1 1 0 0 1 1 1v10l-4-2.5L4 12V2a1 1 0 0 1 1-1z" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    Markly
+  </a>
+  <div class="topbar-sep"></div>
+  <span class="page-label">书签管理</span>
+  <div class="topbar-right">
+    <a class="btn btn-ghost" href="/">← 返回首页</a>
+    <button class="btn btn-primary" onclick="openModal()">
+      <svg width="12" height="12" viewBox="0 0 12 12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"><path d="M6 1v10M1 6h10"/></svg>
+      新增书签
+    </button>
+  </div>
+</header>
+
+<div class="page">
+  <div class="page-header">
+    <div>
+      <div class="page-heading">书签列表</div>
+      <div class="page-sub">管理所有已保存的书签，支持增删改查。</div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="search-wrap">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+        <circle cx="6" cy="6" r="4.5"/><path d="M10.5 10.5l2 2"/>
+      </svg>
+      <input type="search" id="search" placeholder="搜索标题、描述、链接…" autocomplete="off" />
+    </div>
+    <span class="result-count" id="result-count"></span>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:52px;text-align:center">顺序</th>
+          <th>书签</th>
+          <th>标签</th>
+          <th>描述</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr class="skel"><td></td><td><div class="skel-line" style="width:200px"></div></td><td><div class="skel-line" style="width:80px"></div></td><td><div class="skel-line" style="width:160px"></div></td><td></td></tr>
+        <tr class="skel"><td></td><td><div class="skel-line" style="width:180px"></div></td><td><div class="skel-line" style="width:100px"></div></td><td><div class="skel-line" style="width:140px"></div></td><td></td></tr>
+        <tr class="skel"><td></td><td><div class="skel-line" style="width:160px"></div></td><td><div class="skel-line" style="width:60px"></div></td><td><div class="skel-line" style="width:180px"></div></td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 新增/编辑 modal -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">新增书签</span>
+      <button class="icon-btn" onclick="closeModal()">
+        <svg width="12" height="12" viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="1" y1="1" x2="11" y2="11"/><line x1="11" y1="1" x2="1" y2="11"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group full">
+        <label>链接 *</label>
+        <input type="text" id="f-url" placeholder="https://example.com" />
+      </div>
+      <div class="form-group full">
+        <label>标题 *</label>
+        <input type="text" id="f-title" placeholder="书签名称" />
+      </div>
+      <div class="form-group full">
+        <label>描述</label>
+        <textarea id="f-description" placeholder="简单介绍这个书签的用途…"></textarea>
+      </div>
+      <div class="form-group full">
+        <label>标签 <small>Enter 或逗号确认，Backspace 删除</small></label>
+        <div class="tag-input-wrap" id="tag-wrap" onclick="document.getElementById('tag-field').focus()">
+          <input class="tag-input-field" id="tag-field" placeholder="添加标签…" autocomplete="off" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>自定义图标 URL <small>留空则自动获取 favicon</small></label>
+        <input type="text" id="f-icon" placeholder="https://example.com/icon.png" />
+      </div>
+      <div class="form-group">
+        <label>显示顺序 <small>数字越小越靠前</small></label>
+        <input type="text" id="f-order" placeholder="0" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" id="save-btn" onclick="saveBookmark()">添加</button>
+    </div>
+  </div>
+</div>
+
+<!-- 删除确认 -->
+<div class="modal-overlay" id="confirm-overlay">
+  <div class="confirm-box" role="dialog" aria-modal="true">
+    <div class="confirm-title">确认删除</div>
+    <div class="confirm-body" id="confirm-body"></div>
+    <div class="confirm-actions">
+      <button class="btn btn-ghost" onclick="closeConfirm()">取消</button>
+      <button class="btn btn-danger" id="confirm-ok">删除</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  const PALETTE = [
+    {bg:'#eeedfd',c:'#3730c4'},{bg:'#e1f5ee',c:'#0a6649'},
+    {bg:'#faeeda',c:'#7a4a08'},{bg:'#e6f1fb',c:'#1054a0'},
+    {bg:'#f3e8ff',c:'#6b21a8'},{bg:'#fde8e8',c:'#9f1239'},
+    {bg:'#ecfdf5',c:'#065f46'},{bg:'#fffbeb',c:'#92400e'},
+  ];
+  const PALETTE_DARK = [
+    {bg:'#1e1c3a',c:'#a09bff'},{bg:'#0d2a1f',c:'#4dc494'},
+    {bg:'#261d08',c:'#d4a843'},{bg:'#0e1f35',c:'#5fa8ee'},
+    {bg:'#2d1a4a',c:'#c084fc'},{bg:'#3b0a0a',c:'#fca5a5'},
+    {bg:'#064e3b',c:'#6ee7b7'},{bg:'#451a03',c:'#fcd34d'},
+  ];
+  const pal = window.matchMedia('(prefers-color-scheme: dark)').matches ? PALETTE_DARK : PALETTE;
+  const colorMap = {};
+  function tagColor(tag) {
+    if (!colorMap[tag]) colorMap[tag] = pal[Object.keys(colorMap).length % pal.length];
+    return colorMap[tag];
+  }
+
+  let ALL = [], keyword = '', editingId = null, formTags = [], confirmCb = null;
+
+  const $tbody  = document.getElementById('tbody');
+  const $search = document.getElementById('search');
+  const $count  = document.getElementById('result-count');
+  const $modal  = document.getElementById('modal-overlay');
+  const $modalTitle = document.getElementById('modal-title');
+  const $saveBtn    = document.getElementById('save-btn');
+  const $confirm    = document.getElementById('confirm-overlay');
+  const $confirmBody= document.getElementById('confirm-body');
+  const $confirmOk  = document.getElementById('confirm-ok');
+  const $tagWrap    = document.getElementById('tag-wrap');
+  const $tagField   = document.getElementById('tag-field');
+  const $toast      = document.getElementById('toast');
+
+  /* toast */
+  let toastTimer;
+  function showToast(msg, type = '') {
+    clearTimeout(toastTimer);
+    $toast.textContent = msg;
+    $toast.className = 'toast' + (type ? ' ' + type : '');
+    requestAnimationFrame(() => $toast.classList.add('show'));
+    toastTimer = setTimeout(() => $toast.classList.remove('show'), 2600);
+  }
+
+  /* tag input */
+  function renderFormTags() {
+    $tagWrap.querySelectorAll('.tag-chip').forEach(el => el.remove());
+    formTags.forEach((t, i) => {
+      const chip = document.createElement('div'); chip.className = 'tag-chip';
+      const s = tagColor(t); chip.style.background = s.bg; chip.style.color = s.c;
+      chip.innerHTML = `${esc(t)}<button class="tag-chip-x" type="button">×</button>`;
+      chip.querySelector('.tag-chip-x').onclick = () => { formTags.splice(i, 1); renderFormTags(); };
+      $tagWrap.insertBefore(chip, $tagField);
+    });
+  }
+  function addFormTag(raw) {
+    raw.split(/[,，]+/).map(s => s.trim()).filter(s => s && !formTags.includes(s)).forEach(s => formTags.push(s));
+    renderFormTags(); $tagField.value = '';
+  }
+  $tagField.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ',' || e.key === '，') { e.preventDefault(); addFormTag($tagField.value); }
+    else if (e.key === 'Backspace' && !$tagField.value && formTags.length) { formTags.pop(); renderFormTags(); }
+  });
+  $tagField.addEventListener('blur', () => { if ($tagField.value.trim()) addFormTag($tagField.value); });
+
+  /* favicon helper */
+  function faviconEl(bm) {
+    const domain = (() => { try { return new URL(bm.url).hostname; } catch { return ''; } })();
+    const src = bm.icon || (domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : '');
+    const wrap = document.createElement('div'); wrap.className = 'bm-favicon';
+    if (src) {
+      const img = document.createElement('img'); img.src = src; img.alt = '';
+      img.onerror = () => { wrap.innerHTML = (bm.title || '?')[0].toUpperCase(); };
+      wrap.appendChild(img);
+    } else {
+      wrap.textContent = (bm.title || '?')[0].toUpperCase();
+    }
+    return wrap;
+  }
+
+  /* table */
+  function filtered() {
+    if (!keyword) return ALL;
+    const kw = keyword.toLowerCase();
+    return ALL.filter(b => b.title.toLowerCase().includes(kw) || (b.description || '').toLowerCase().includes(kw) || b.url.toLowerCase().includes(kw));
+  }
+
+  function renderTable() {
+    const list = filtered();
+    $count.textContent = `共 ${list.length} 个书签`;
+    if (!list.length) {
+      $tbody.innerHTML = `<tr><td colspan="5"><div class="empty">
+        <svg width="36" height="36" viewBox="0 0 36 36" fill="none" stroke="currentColor" stroke-width="1.4">
+          <path d="M10 4h16a2 2 0 0 1 2 2v26l-10-6-10 6V6a2 2 0 0 1 2-2z"/>
+        </svg>
+        <p>${ALL.length ? '没有匹配的书签' : '还没有书签，点击「新增书签」开始添加'}</p>
+      </div></td></tr>`;
+      return;
+    }
+    $tbody.innerHTML = '';
+    list.forEach(bm => {
+      const domain = (() => { try { return new URL(bm.url).hostname; } catch { return bm.url; } })();
+      const tr = document.createElement('tr');
+
+      /* bookmark cell */
+      const tdBm = document.createElement('td');
+      const cell = document.createElement('div'); cell.className = 'bm-cell';
+      cell.appendChild(faviconEl(bm));
+      const info = document.createElement('div');
+      info.innerHTML = `<div class="bm-title">${esc(bm.title)}</div><div class="bm-url"><a href="${esc(bm.url)}" target="_blank" rel="noopener">${esc(domain)}</a></div>`;
+      cell.appendChild(info); tdBm.appendChild(cell);
+
+      /* tags cell */
+      const tdTags = document.createElement('td');
+      const tagsDiv = document.createElement('div'); tagsDiv.className = 'tags-cell';
+      if ((bm.tags || []).length) {
+        bm.tags.forEach(t => {
+          const s = tagColor(t);
+          const span = document.createElement('span'); span.className = 'tag';
+          span.textContent = t; span.style.background = s.bg; span.style.color = s.c;
+          tagsDiv.appendChild(span);
+        });
+      } else {
+        tagsDiv.innerHTML = `<span style="color:var(--text3);font-size:12px">—</span>`;
+      }
+      tdTags.appendChild(tagsDiv);
+
+      /* desc cell */
+      const tdDesc = document.createElement('td');
+      tdDesc.innerHTML = `<div class="desc-cell">${esc(bm.description || '—')}</div>`;
+
+      /* actions */
+      const tdAct = document.createElement('td');
+      const acts = document.createElement('div'); acts.className = 'actions';
+      const editBtn = document.createElement('button'); editBtn.className = 'icon-btn'; editBtn.title = '编辑';
+      editBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 13 13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M9.5 1.5l2 2L4 11H2V9L9.5 1.5z"/></svg>`;
+      editBtn.onclick = () => openModal(bm);
+      const delBtn = document.createElement('button'); delBtn.className = 'icon-btn danger'; delBtn.title = '删除';
+      delBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 13 13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M2 3.5h9M5 3.5V2h3v1.5M4 3.5l.5 7h4l.5-7"/></svg>`;
+      delBtn.onclick = () => confirmDelete(bm);
+      acts.appendChild(editBtn); acts.appendChild(delBtn); tdAct.appendChild(acts);
+
+      /* order cell */
+      const tdOrder = document.createElement('td');
+      tdOrder.style.textAlign = 'center';
+      tdOrder.innerHTML = `<span style="font-size:12px;color:var(--text3);font-variant-numeric:tabular-nums">${bm.order ?? 0}</span>`;
+
+      tr.append(tdOrder, tdBm, tdTags, tdDesc, tdAct);
+      $tbody.appendChild(tr);
+    });
+  }
+
+  /* modal */
+  window.openModal = function(bm) {
+    editingId = bm ? bm.id : null;
+    $modalTitle.textContent = bm ? '编辑书签' : '新增书签';
+    $saveBtn.textContent    = bm ? '保存修改' : '添加';
+    document.getElementById('f-url').value         = bm ? bm.url         : '';
+    document.getElementById('f-title').value       = bm ? bm.title       : '';
+    document.getElementById('f-description').value = bm ? (bm.description || '') : '';
+    document.getElementById('f-icon').value        = bm ? (bm.icon || '') : '';
+    document.getElementById('f-order').value       = bm ? (bm.order ?? 0) : 0;
+    formTags = bm ? [...(bm.tags || [])] : [];
+    $tagField.value = ''; renderFormTags();
+    $modal.classList.add('open');
+    document.getElementById('f-url').focus();
+  };
+  window.closeModal = function() { $modal.classList.remove('open'); editingId = null; };
+
+  /* auto-fill title from URL */
+  document.getElementById('f-url').addEventListener('blur', async () => {
+    const urlVal = document.getElementById('f-url').value.trim();
+    const titleVal = document.getElementById('f-title').value.trim();
+    if (!urlVal || titleVal) return;
+    try {
+      const domain = new URL(urlVal).hostname;
+      document.getElementById('f-title').value = domain.replace(/^www\./, '');
+    } catch { /* invalid url */ }
+  });
+
+  window.saveBookmark = async function() {
+    if ($tagField.value.trim()) addFormTag($tagField.value);
+    const url   = document.getElementById('f-url').value.trim();
+    const title = document.getElementById('f-title').value.trim();
+    if (!url)   { showToast('请填写链接', 'error'); return; }
+    if (!title) { showToast('请填写标题', 'error'); return; }
+    const body = {
+      url, title,
+      description: document.getElementById('f-description').value.trim(),
+      tags: formTags,
+      icon: document.getElementById('f-icon').value.trim(),
+      order: parseInt(document.getElementById('f-order').value, 10) || 0,
+    };
+    $saveBtn.disabled = true;
+    try {
+      const res = await fetch(editingId ? `/api/bookmarks/${editingId}` : '/api/bookmarks', {
+        method: editingId ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.detail || res.status); }
+      closeModal(); await reload();
+      showToast(editingId ? '已保存修改' : '书签已添加', 'success');
+    } catch (e) { showToast('保存失败：' + e.message, 'error'); }
+    finally { $saveBtn.disabled = false; }
+  };
+
+  /* confirm delete */
+  function confirmDelete(bm) {
+    $confirmBody.textContent = `确定要删除「${bm.title}」吗？此操作无法撤销。`;
+    confirmCb = async () => {
+      try {
+        await fetch(`/api/bookmarks/${bm.id}`, { method: 'DELETE' });
+        closeConfirm(); await reload(); showToast('已删除', 'success');
+      } catch (e) { showToast('删除失败：' + e.message, 'error'); }
+    };
+    $confirm.classList.add('open'); $confirmOk.focus();
+  }
+  window.closeConfirm = function() { $confirm.classList.remove('open'); confirmCb = null; };
+  $confirmOk.addEventListener('click', () => { if (confirmCb) confirmCb(); });
+
+  /* events */
+  $modal.addEventListener('click', e => { if (e.target === $modal) closeModal(); });
+  $confirm.addEventListener('click', e => { if (e.target === $confirm) closeConfirm(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeConfirm(); } });
+  $search.addEventListener('input', () => { keyword = $search.value.trim().toLowerCase(); renderTable(); });
+
+  /* data */
+  async function reload() {
+    try { const r = await fetch('/api/bookmarks'); ALL = await r.json(); }
+    catch { ALL = []; }
+    renderTable();
+  }
+
+  function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  reload();
+})();
+</script>
+</body>
+</html>

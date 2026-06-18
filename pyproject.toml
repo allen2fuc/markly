@@ -1,0 +1,13 @@
+[project]
+name = "markly"
+version = "0.1.0"
+description = "个人书签与搜索中心"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.137.1",
+    "jinja2>=3.1.6",
+    "pydantic-settings>=2.14.1",
+    "sqlmodel>=0.0.38",
+    "uvicorn>=0.49.0",
+]

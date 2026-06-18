@@ -1,0 +1,13 @@
+services:
+  markly:
+    build: .
+    ports:
+      - "8001:8000"
+    volumes:
+      - markly_data:/app/data
+    environment:
+      DB_PATH: sqlite:///data/markly.db
+    restart: unless-stopped
+
+volumes:
+  markly_data:
