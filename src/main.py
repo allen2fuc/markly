@@ -89,6 +89,7 @@ def get_db(request: Request) -> Generator[Session, None, None]:
     with Session(state.engine) as session:
         yield session
 
+SessionDep = Annotated[Session, Depends(get_db)]
 
 # ── Pages ─────────────────────────────────────────────────────────────────────
 
@@ -106,9 +107,9 @@ def get_admin(request: Request):
 
 @app.get("/api/bookmarks", response_model=list[BookmarkPublic])
 def list_bookmarks(
+    session: SessionDep,
     tag: str | None = None,
     q: str | None = None,
-    session: Session = Depends(get_db),
 ):
     stmt = select(Bookmark)
     if tag:
@@ -116,11 +117,12 @@ def list_bookmarks(
     if q:
         stmt = stmt.where(Bookmark.title.contains(q) | Bookmark.description.contains(q) | Bookmark.url.contains(q))
     stmt = stmt.order_by(Bookmark.order.asc(), Bookmark.created_at.desc())
-    return session.exec(stmt).all()
+    bookmarks = session.exec(stmt).all()
+    return bookmarks
 
 
 @app.get("/api/bookmarks/{bookmark_id}", response_model=BookmarkPublic)
-def get_bookmark(bookmark_id: uuid.UUID, session: Session = Depends(get_db)):
+def get_bookmark(bookmark_id: uuid.UUID, session: SessionDep):
     bm = session.get(Bookmark, bookmark_id)
     if not bm:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="书签不存在")
@@ -128,7 +130,7 @@ def get_bookmark(bookmark_id: uuid.UUID, session: Session = Depends(get_db)):
 
 
 @app.post("/api/bookmarks", response_model=BookmarkPublic, status_code=status.HTTP_201_CREATED)
-def create_bookmark(data: BookmarkCreate, session: Session = Depends(get_db)):
+def create_bookmark(data: BookmarkCreate, session: SessionDep):
     bm = Bookmark.model_validate(data)
     session.add(bm)
     session.commit()
@@ -137,7 +139,7 @@ def create_bookmark(data: BookmarkCreate, session: Session = Depends(get_db)):
 
 
 @app.put("/api/bookmarks/{bookmark_id}", response_model=BookmarkPublic)
-def update_bookmark(bookmark_id: uuid.UUID, data: BookmarkUpdate, session: Session = Depends(get_db)):
+def update_bookmark(bookmark_id: uuid.UUID, data: BookmarkUpdate, session: SessionDep):
     bm = session.get(Bookmark, bookmark_id)
     if not bm:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="书签不存在")
@@ -152,7 +154,7 @@ def update_bookmark(bookmark_id: uuid.UUID, data: BookmarkUpdate, session: Sessi
 
 
 @app.delete("/api/bookmarks/{bookmark_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_bookmark(bookmark_id: uuid.UUID, session: Session = Depends(get_db)):
+def delete_bookmark(bookmark_id: uuid.UUID, session: SessionDep):
     bm = session.get(Bookmark, bookmark_id)
     if not bm:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="书签不存在")
