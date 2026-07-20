@@ -5,9 +5,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY src/ src/
-COPY templates/ templates/
-COPY static/ static/
+COPY src/ ./src/
+COPY templates/ ./templates/
+COPY static/ ./static/
 
 VOLUME data/ data/
 
