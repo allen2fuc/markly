@@ -1,8 +1,7 @@
 import logging
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime
-from typing import Annotated, Generator, Optional, TypedDict, cast
+from typing import Annotated, Generator, TypedDict, cast
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import Response
@@ -11,9 +10,9 @@ from fastapi.templating import Jinja2Templates
 from pydantic_settings import BaseSettings
 from pydantic import ConfigDict
 from sqlalchemy import Engine
-from sqlmodel import Session, SQLModel, Column, create_engine, select, UUID, DateTime, Field
+from sqlmodel import Session, SQLModel, create_engine, select
 
-from .models import Bookmark
+from .models import Bookmark, BookmarkPublic, BookmarkCreate, BookmarkUpdate
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 logger = logging.getLogger(__name__)
@@ -48,38 +47,6 @@ templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-# ── Schemas ──────────────────────────────────────────────────────────────────
-
-class BookmarkBase(SQLModel):
-    title: Annotated[str, Field(description="书签标题")]
-    url: Annotated[str, Field(description="书签链接")]
-    description: Annotated[str, Field(description="描述")]
-    tags: Annotated[list[str], Field(default_factory=list, description="标签列表")]
-    icon: Annotated[str, Field(description="图标 URL（留空自动使用 favicon）")]
-    order: Annotated[int, Field(description="显示顺序，数字越小越靠前")]
-
-
-class Bookmark(BookmarkBase, table=True):
-    __tablename__ = "bookmarks"
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, sa_column=Column(UUID, primary_key=True))
-    created_at: datetime = Field(sa_column=Column(DateTime, nullable=False, default=datetime.now))
-    updated_at: datetime = Field(sa_column=Column(DateTime, nullable=False, default=datetime.now))
-
-class BookmarkPublic(BookmarkBase):
-    id: Annotated[uuid.UUID, Field(description="书签 ID")]
-    created_at: Annotated[datetime, Field(description="创建时间")]
-    updated_at: Annotated[datetime, Field(description="更新时间")]
-
-class BookmarkCreate(BookmarkBase):
-    pass
-
-class BookmarkUpdate(BookmarkBase):
-    title: Optional[str]
-    url: Optional[str]
-    description: Optional[str]
-    tags: Optional[list[str]]
-    icon: Optional[str]
-    order: Optional[int]
 
 
 # ── DB dependency ─────────────────────────────────────────────────────────────

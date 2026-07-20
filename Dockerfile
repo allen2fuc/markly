@@ -1,4 +1,4 @@
-FROM python:3.13-slim
+FROM python:3.13-alpine
 
 WORKDIR /app
 
@@ -9,9 +9,7 @@ COPY src/ src/
 COPY templates/ templates/
 COPY static/ static/
 
-RUN mkdir -p data
-
-ENV DB_PATH=sqlite:///data/markly.db
+VOLUME data/ data/
 
 EXPOSE 8000
 
