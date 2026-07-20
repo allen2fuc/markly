@@ -1,11 +1,11 @@
-.PHONY: dev install seed clean docker-up docker-down docker-build
+REPOSITORY_NAME := registry.cn-hangzhou.aliyuncs.com/allen2fuc/markly:latest
 
 install:
 	uv sync
 
 dev:
 	mkdir -p data
-	uv run uvicorn src.main:app --reload --port 8001
+	uv run uvicorn src.main:app --reload --port 8000
 
 seed:
 	mkdir -p data
@@ -14,11 +14,8 @@ seed:
 clean:
 	rm -f data/markly.db
 
-docker-build:
-	docker compose build
+build:
+	docker build --platform linux/amd64 . -t ${REPOSITORY_NAME}
 
-docker-up:
-	docker compose up -d
-
-docker-down:
-	docker compose down
+push:
+	docker push ${REPOSITORY_NAME}

@@ -1,4 +1,4 @@
-FROM python:3.13-alpine
+FROM uhub.service.ucloud.cn/allen2fuc/python:3.13-alpine
 
 WORKDIR /app
 
