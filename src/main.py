@@ -8,6 +8,7 @@ from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile, 
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from pydantic_settings import BaseSettings
 from pydantic import ConfigDict
 from sqlalchemy import Engine
@@ -16,6 +17,7 @@ from sqlmodel import Session, SQLModel, create_engine, select
 from .models import Bookmark, BookmarkPublic, BookmarkCreate, BookmarkUpdate
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 UPLOAD_DIR = Path("static/uploads")
@@ -67,9 +69,15 @@ SessionDep = Annotated[Session, Depends(get_db)]
 
 @app.middleware("http")
 async def log_request(request: Request, call_next):
-    logger.info(f"Request: {request.method} {request.url.path} {request.client.host}")
+    if not request.url.path.startswith("/static"):
+        logger.info(f"Request: {request.method} {request.url.path} {request.client.host}")
     response = await call_next(request)
     return response
+
+app.add_middleware(
+    ProxyHeadersMiddleware,
+    trusted_hosts=["*"],
+)
 
 # ── Pages ─────────────────────────────────────────────────────────────────────
 
