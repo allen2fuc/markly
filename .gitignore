@@ -37,6 +37,9 @@ env/
 # SQLite database
 data/
 
+# Uploaded icons
+static/uploads/
+
 # Testing & coverage
 .pytest_cache/
 .coverage

@@ -95,9 +95,14 @@
           <input class="tag-input-field" id="tag-field" placeholder="添加标签…" autocomplete="off" />
         </div>
       </div>
-      <div class="form-group">
-        <label>自定义图标 URL <small>留空则自动获取 favicon</small></label>
-        <input type="text" id="f-icon" placeholder="https://example.com/icon.png" />
+      <div class="form-group full">
+        <label>自定义图标 <small>留空则自动获取 favicon</small></label>
+        <div class="icon-field-row">
+          <img id="f-icon-preview" class="icon-preview" alt="" hidden />
+          <input type="text" id="f-icon" placeholder="https://example.com/icon.png" />
+          <button type="button" class="btn btn-ghost" id="icon-upload-btn">上传图片</button>
+          <input type="file" id="f-icon-file" accept="image/*" hidden />
+        </div>
       </div>
       <div class="form-group">
         <label>显示顺序 <small>数字越小越靠前</small></label>

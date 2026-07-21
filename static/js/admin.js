@@ -32,6 +32,10 @@
   const $tagWrap    = document.getElementById('tag-wrap');
   const $tagField   = document.getElementById('tag-field');
   const $toast      = document.getElementById('toast');
+  const $iconInput      = document.getElementById('f-icon');
+  const $iconPreview    = document.getElementById('f-icon-preview');
+  const $iconUploadBtn  = document.getElementById('icon-upload-btn');
+  const $iconFileInput  = document.getElementById('f-icon-file');
 
   /* toast */
   let toastTimer;
@@ -63,6 +67,32 @@
     else if (e.key === 'Backspace' && !$tagField.value && formTags.length) { formTags.pop(); renderFormTags(); }
   });
   $tagField.addEventListener('blur', () => { if ($tagField.value.trim()) addFormTag($tagField.value); });
+
+  /* icon field */
+  function updateIconPreview() {
+    const val = $iconInput.value.trim();
+    if (val) { $iconPreview.src = val; $iconPreview.hidden = false; }
+    else { $iconPreview.hidden = true; $iconPreview.removeAttribute('src'); }
+  }
+  $iconPreview.addEventListener('error', () => { $iconPreview.hidden = true; });
+  $iconInput.addEventListener('input', updateIconPreview);
+  $iconUploadBtn.addEventListener('click', () => $iconFileInput.click());
+  $iconFileInput.addEventListener('change', async () => {
+    const file = $iconFileInput.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    $iconUploadBtn.disabled = true;
+    try {
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.detail || res.status); }
+      const data = await res.json();
+      $iconInput.value = data.url;
+      updateIconPreview();
+      showToast('图标已上传', 'success');
+    } catch (e) { showToast('上传失败：' + e.message, 'error'); }
+    finally { $iconUploadBtn.disabled = false; $iconFileInput.value = ''; }
+  });
 
   /* favicon helper */
   function faviconEl(bm) {
@@ -159,7 +189,8 @@
     document.getElementById('f-url').value         = bm ? bm.url         : '';
     document.getElementById('f-title').value       = bm ? bm.title       : '';
     document.getElementById('f-description').value = bm ? (bm.description || '') : '';
-    document.getElementById('f-icon').value        = bm ? (bm.icon || '') : '';
+    $iconInput.value = bm ? (bm.icon || '') : '';
+    updateIconPreview();
     document.getElementById('f-order').value       = bm ? (bm.order ?? 0) : 0;
     formTags = bm ? [...(bm.tags || [])] : [];
     $tagField.value = ''; renderFormTags();

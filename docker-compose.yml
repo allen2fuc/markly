@@ -5,9 +5,11 @@ services:
       - "8001:8000"
     volumes:
       - markly_data:/app/data
+      - markly_uploads:/app/static/uploads
     environment:
       DB_PATH: sqlite:///data/markly.db
     restart: unless-stopped
 
 volumes:
   markly_data:
+  markly_uploads:

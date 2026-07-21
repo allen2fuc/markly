@@ -33,6 +33,8 @@ pydantic-settings==2.14.1
     # via markly
 python-dotenv==1.2.2
     # via pydantic-settings
+python-multipart==0.0.32
+    # via markly
 sqlalchemy==2.0.51
     # via sqlmodel
 sqlmodel==0.0.38

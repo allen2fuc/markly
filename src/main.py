@@ -1,9 +1,10 @@
 import logging
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Annotated, Generator, TypedDict, cast
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -16,6 +17,10 @@ from .models import Bookmark, BookmarkPublic, BookmarkCreate, BookmarkUpdate
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 logger = logging.getLogger(__name__)
+
+UPLOAD_DIR = Path("static/uploads")
+ALLOWED_ICON_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico"}
+MAX_ICON_BYTES = 2 * 1024 * 1024
 
 
 class Settings(BaseSettings):
@@ -58,6 +63,14 @@ def get_db(request: Request) -> Generator[Session, None, None]:
 
 SessionDep = Annotated[Session, Depends(get_db)]
 
+# ── Middleware ─────────────────────────────────────────────────────────────────
+
+@app.middleware("http")
+async def log_request(request: Request, call_next):
+    logger.info(f"Request: {request.method} {request.url.path} {request.client.host}")
+    response = await call_next(request)
+    return response
+
 # ── Pages ─────────────────────────────────────────────────────────────────────
 
 @app.get("/")
@@ -71,6 +84,27 @@ def get_admin(request: Request):
 
 
 # ── API ───────────────────────────────────────────────────────────────────────
+
+@app.post("/api/upload")
+async def upload_icon(file: UploadFile = File(...)):
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in ALLOWED_ICON_EXTENSIONS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不支持的图片格式")
+
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    dest = UPLOAD_DIR / f"{uuid.uuid4().hex}{ext}"
+    size = 0
+    with dest.open("wb") as out:
+        while chunk := await file.read(1024 * 1024):
+            size += len(chunk)
+            if size > MAX_ICON_BYTES:
+                out.close()
+                dest.unlink(missing_ok=True)
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="图片不能超过 2MB")
+            out.write(chunk)
+
+    return {"url": f"/static/uploads/{dest.name}"}
+
 
 @app.get("/api/bookmarks", response_model=list[BookmarkPublic])
 def list_bookmarks(
